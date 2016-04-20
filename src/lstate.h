@@ -13,6 +13,7 @@
 #include "ltm.h"
 #include "lzio.h"
 
+#include "lvector.h"
 
 /*
 
@@ -140,6 +141,8 @@ typedef struct global_State {
   TString *memerrmsg;  /* memory-error message */
   TString *tmname[TM_N];  /* array with tag-method names */
   struct Table *mt[LUA_NUMTAGS];  /* metatables for basic types */
+
+  struct vector_env* vt_env; // vector env
 } global_State;
 
 
@@ -186,6 +189,7 @@ union GCUnion {
   struct Table h;
   struct Proto p;
   struct lua_State th;  /* thread */
+  struct TVector vt; /* vector */
 };
 
 
@@ -202,6 +206,7 @@ union GCUnion {
 #define gco2t(o)  check_exp((o)->tt == LUA_TTABLE, &((cast_u(o))->h))
 #define gco2p(o)  check_exp((o)->tt == LUA_TPROTO, &((cast_u(o))->p))
 #define gco2th(o)  check_exp((o)->tt == LUA_TTHREAD, &((cast_u(o))->th))
+#define gco2vt(o)  check_exp((o)->tt == LUA_TVECTOR, &((cast_u(o))->vt))
 
 
 /* macro to convert a Lua object into a GCObject */

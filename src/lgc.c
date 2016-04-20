@@ -264,6 +264,10 @@ static void reallymarkobject (global_State *g, GCObject *o) {
       linkgclist(gco2p(o), g->gray);
       break;
     }
+    case LUA_TVECTOR: {
+      gray2black(o);
+      break;
+    }
     default: lua_assert(0); break;
   }
 }
@@ -693,6 +697,9 @@ static void freeobj (lua_State *L, GCObject *o) {
     case LUA_TLNGSTR: {
       luaM_freemem(L, o, sizestring(gco2ts(o)));
       break;
+    }
+    case LUA_TVECTOR: {
+      luaVT_free(L, gco2vt(o)); break;
     }
     default: lua_assert(0);
   }

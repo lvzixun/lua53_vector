@@ -64,6 +64,14 @@ LUAI_DDEF const char *const luaP_opnames[NUM_OPCODES+1] = {
   "SETLIST",
   "CLOSURE",
   "VARARG",
+
+  "VT_CREATE",
+  "VT_CLONE",
+  "VT_IADD",
+  "VT_ISUB",
+  "VT_IMUL",
+  "VT_ISCALE",
+
   "EXTRAARG",
   NULL
 };
@@ -119,6 +127,14 @@ LUAI_DDEF const lu_byte luaP_opmodes[NUM_OPCODES] = {
  ,opmode(0, 0, OpArgU, OpArgU, iABC)		/* OP_SETLIST */
  ,opmode(0, 1, OpArgU, OpArgN, iABx)		/* OP_CLOSURE */
  ,opmode(0, 1, OpArgU, OpArgN, iABC)		/* OP_VARARG */
+
+ ,opmode(0, 1, OpArgU, OpArgN, iABx)   /* OP_VT_CREATE */
+ ,opmode(0, 1, OpArgK, OpArgN, iABC)   /* OP_VT_CLONE */
+ ,opmode(0, 1, OpArgK, OpArgN, iABC)   /* OP_VT_IADD */
+ ,opmode(0, 1, OpArgK, OpArgN, iABC)   /* OP_VT_ISUB */
+ ,opmode(0, 1, OpArgK, OpArgN, iABC)   /* OP_VT_IMUL */
+ ,opmode(0, 1, OpArgK, OpArgN, iABC)   /* OP_VT_IDISTANCE */
+
  ,opmode(0, 0, OpArgU, OpArgU, iAx)		/* OP_EXTRAARG */
 };
 

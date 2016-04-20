@@ -31,7 +31,7 @@ PLATS= aix bsd c89 freebsd generic linux macosx mingw posix solaris
 LUA_A=	liblua.a
 CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
 	lmem.o lobject.o lopcodes.o lparser.o lstate.o lstring.o ltable.o \
-	ltm.o lundump.o lvm.o lzio.o
+	ltm.o lundump.o lvm.o lzio.o lvector.o
 LIB_O=	lauxlib.o lbaselib.o lbitlib.o lcorolib.o ldblib.o liolib.o \
 	lmathlib.o loslib.o lstrlib.o ltablib.o lutf8lib.o loadlib.o linit.o
 BASE_O= $(CORE_O) $(LIB_O) $(MYOBJS)
@@ -50,6 +50,9 @@ ALL_A= $(LUA_A)
 default: $(PLAT)
 
 all:	$(ALL_T)
+	cc -O2 -Wall --shared -o $(PWD)/../test/vector.so $(PWD)/../test/vector.c -fPIC -dynamiclib -Wl,-undefined,dynamic_lookup
+	cp $(PWD)/lua $(PWD)/../test/
+	cp $(PWD)/luac $(PWD)/../test/
 
 o:	$(ALL_O)
 
@@ -193,5 +196,5 @@ lvm.o: lvm.c lprefix.h lua.h luaconf.h ldebug.h lstate.h lobject.h \
   ltable.h lvm.h
 lzio.o: lzio.c lprefix.h lua.h luaconf.h llimits.h lmem.h lstate.h \
   lobject.h ltm.h lzio.h
-
+lvector.o: lvector.c lstate.h lobject.h lua.h 
 # (end of Makefile)

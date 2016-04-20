@@ -9,7 +9,7 @@
 
 #include "lprefix.h"
 
-
+#include <assert.h>
 #include <stdarg.h>
 #include <string.h>
 
@@ -340,7 +340,6 @@ LUA_API size_t lua_stringtonumber (lua_State *L, const char *s) {
   return sz;
 }
 
-
 LUA_API lua_Number lua_tonumberx (lua_State *L, int idx, int *pisnum) {
   lua_Number n;
   const TValue *o = index2addr(L, idx);
@@ -366,6 +365,20 @@ LUA_API lua_Integer lua_tointegerx (lua_State *L, int idx, int *pisnum) {
 LUA_API int lua_toboolean (lua_State *L, int idx) {
   const TValue *o = index2addr(L, idx);
   return !l_isfalse(o);
+}
+
+
+LUA_API lua_vector* lua_tovector (lua_State *L, int idx, lua_vector* out_vt) {
+  StkId o = index2addr(L, idx);
+  if(ttisvector(o)){
+    TVector* v = vtvalue(o);
+    int i;
+    for(i=0; i<VECTOR_ELEMENT_LEN; i++) {
+      out_vt->elements[i] = v->elements[i];
+    }
+    return out_vt;
+  }
+  return NULL;
 }
 
 
@@ -431,6 +444,7 @@ LUA_API const void *lua_topointer (lua_State *L, int idx) {
     case LUA_TCCL: return clCvalue(o);
     case LUA_TLCF: return cast(void *, cast(size_t, fvalue(o)));
     case LUA_TTHREAD: return thvalue(o);
+    case LUA_TVECTOR: return vtvalue(o);
     case LUA_TUSERDATA:
     case LUA_TLIGHTUSERDATA:
       return lua_touserdata(L, idx);
@@ -660,6 +674,19 @@ LUA_API int lua_rawgetp (lua_State *L, int idx, const void *p) {
   return ttnov(L->top - 1);
 }
 
+LUA_API void lua_newvector(lua_State* L, lua_vector* v) {
+  TVector* vt;
+  int i;
+  lua_lock(L);
+  luaC_checkGC(L);
+  vt = luaVT_new(L);
+  for(i=0; i<VECTOR_ELEMENT_LEN; i++) {
+    vt->elements[i] = v->elements[i];
+  }
+  setvtvalue(L, L->top, vt);
+  api_incr_top(L);
+  lua_unlock(L);
+}
 
 LUA_API void lua_createtable (lua_State *L, int narray, int nrec) {
   Table *t;

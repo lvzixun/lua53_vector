@@ -68,8 +68,10 @@ typedef struct lua_State lua_State;
 #define LUA_TFUNCTION		6
 #define LUA_TUSERDATA		7
 #define LUA_TTHREAD		8
+#define LUA_TVECTOR   9
 
-#define LUA_NUMTAGS		9
+#define LUA_NUMTAGS		10
+
 
 
 
@@ -82,6 +84,13 @@ typedef struct lua_State lua_State;
 #define LUA_RIDX_GLOBALS	2
 #define LUA_RIDX_LAST		LUA_RIDX_GLOBALS
 
+
+/* typedef fo vector in Lua */
+
+#define VECTOR_ELEMENT_LEN 4
+typedef struct {
+  double elements[VECTOR_ELEMENT_LEN];
+} lua_vector;
 
 /* type of numbers in Lua */
 typedef LUA_NUMBER lua_Number;
@@ -185,6 +194,7 @@ LUA_API lua_CFunction   (lua_tocfunction) (lua_State *L, int idx);
 LUA_API void	       *(lua_touserdata) (lua_State *L, int idx);
 LUA_API lua_State      *(lua_tothread) (lua_State *L, int idx);
 LUA_API const void     *(lua_topointer) (lua_State *L, int idx);
+LUA_API lua_vector     *(lua_tovector) (lua_State *L, int idx, lua_vector* out_vt);
 
 
 /*
@@ -248,6 +258,7 @@ LUA_API void  (lua_createtable) (lua_State *L, int narr, int nrec);
 LUA_API void *(lua_newuserdata) (lua_State *L, size_t sz);
 LUA_API int   (lua_getmetatable) (lua_State *L, int objindex);
 LUA_API int  (lua_getuservalue) (lua_State *L, int idx);
+LUA_API void (lua_newvector) (lua_State* L, lua_vector* v);
 
 
 /*

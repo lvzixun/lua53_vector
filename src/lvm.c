@@ -28,7 +28,7 @@
 #include "ltable.h"
 #include "ltm.h"
 #include "lvm.h"
-
+#include "lvector.h"
 
 /*
 ** You can define LUA_FLOORN2I if you want to convert floats to integers
@@ -174,6 +174,18 @@ void luaV_gettable (lua_State *L, const TValue *t, TValue *key, StkId val) {
         return;
       }
       /* else will try metamethod */
+    }
+    else if(ttisvector(t)) { // `t` is a vector?
+      TVector* v = vtvalue(t);
+      if(ttisinteger(key)){
+        lua_Integer idx = ivalue(key);
+        if(idx >= 1 && idx <= VECTOR_ELEMENT_LEN){
+          double x = v->elements[idx-1];
+          setfltvalue(val, x);
+          return;
+        }
+      }
+      luaG_runerror(L, "vector index region: [1, %d]", VECTOR_ELEMENT_LEN);
     }
     else if (ttisnil(tm = luaT_gettmbyobj(L, t, TM_INDEX)))
       luaG_typeerror(L, t, "index");  /* no metamethod */
@@ -404,6 +416,10 @@ void luaV_concat (lua_State *L, int total) {
 void luaV_objlen (lua_State *L, StkId ra, const TValue *rb) {
   const TValue *tm;
   switch (ttnov(rb)) {
+    case LUA_TVECTOR: {
+      setivalue(ra, VECTOR_ELEMENT_LEN);
+      return;
+    }
     case LUA_TTABLE: {
       Table *h = hvalue(rb);
       tm = fasttm(L, h->metatable, TM_LEN);
@@ -750,8 +766,13 @@ void luaV_execute (lua_State *L) {
         if (ttisinteger(rb) && ttisinteger(rc)) {
           lua_Integer ib = ivalue(rb); lua_Integer ic = ivalue(rc);
           setivalue(ra, intop(+, ib, ic));
-        }
-        else if (tonumber(rb, &nb) && tonumber(rc, &nc)) {
+        } else if (ttisvector(rb) && ttisvector(rc)) {
+          TVector* r = luaVT_new(L);
+          TVector* v1 = vtvalue(rb);
+          TVector* v2 = vtvalue(rc);
+          luaVT_add(v1, v2, r);
+          setvtvalue(L, ra, r);
+        } else if (tonumber(rb, &nb) && tonumber(rc, &nc)) {
           setfltvalue(ra, luai_numadd(L, nb, nc));
         }
         else { Protect(luaT_trybinTM(L, rb, rc, ra, TM_ADD)); }
@@ -764,8 +785,13 @@ void luaV_execute (lua_State *L) {
         if (ttisinteger(rb) && ttisinteger(rc)) {
           lua_Integer ib = ivalue(rb); lua_Integer ic = ivalue(rc);
           setivalue(ra, intop(-, ib, ic));
-        }
-        else if (tonumber(rb, &nb) && tonumber(rc, &nc)) {
+        } else if (ttisvector(rb) && ttisvector(rc)) {
+          TVector* r = luaVT_new(L);
+          TVector* v1 = vtvalue(rb);
+          TVector* v2 = vtvalue(rc);
+          luaVT_sub(v1, v2, r);
+          setvtvalue(L, ra, r); 
+        }else if (tonumber(rb, &nb) && tonumber(rc, &nc)) {
           setfltvalue(ra, luai_numsub(L, nb, nc));
         }
         else { Protect(luaT_trybinTM(L, rb, rc, ra, TM_SUB)); }
@@ -778,6 +804,23 @@ void luaV_execute (lua_State *L) {
         if (ttisinteger(rb) && ttisinteger(rc)) {
           lua_Integer ib = ivalue(rb); lua_Integer ic = ivalue(rc);
           setivalue(ra, intop(*, ib, ic));
+        } else if (ttisvector(rb) && ttisvector(rc)) {
+          TVector* v1 = vtvalue(rb);
+          TVector* v2 = vtvalue(rc);
+          lua_Number v = luaVT_mul(v1, v2);
+          setfltvalue(ra, v);
+        } else if(ttisvector(rb) && ttisnumber(rc)) {
+          TVector* r = luaVT_new(L);
+          TVector* v1 = vtvalue(rb);
+          double k = nvalue(rc);
+          luaVT_scale(v1, k, r);
+          setvtvalue(L, ra, r); 
+        } else if (ttisvector(rc) && ttisnumber(rb)) {
+          TVector* r = luaVT_new(L);
+          TVector* v1 = vtvalue(rc);
+          double k = nvalue(rb);
+          luaVT_scale(v1, k, r);
+          setvtvalue(L, ra, r); 
         }
         else if (tonumber(rb, &nb) && tonumber(rc, &nc)) {
           setfltvalue(ra, luai_nummul(L, nb, nc));
@@ -881,6 +924,11 @@ void luaV_execute (lua_State *L) {
         lua_Number nb; lua_Number nc;
         if (tonumber(rb, &nb) && tonumber(rc, &nc)) {
           setfltvalue(ra, luai_numpow(L, nb, nc));
+        } else if (ttisvector(rb) && ttisvector(rc)) {
+          TVector* v1 = vtvalue(rb);
+          TVector* v2 = vtvalue(rc);
+          lua_Number v = luaVT_distance(v1, v2);
+          setfltvalue(ra, v);
         }
         else { Protect(luaT_trybinTM(L, rb, rc, ra, TM_POW)); }
         vmbreak;
@@ -1172,6 +1220,77 @@ void luaV_execute (lua_State *L) {
       }
       vmcase(OP_EXTRAARG) {
         lua_assert(0);
+        vmbreak;
+      }
+      vmcase(OP_VT_CREATE) {
+        double vt[VECTOR_ELEMENT_LEN] = {0.0};
+        unsigned int params = GETARG_Bx(i);
+        unsigned int count = (params==0)?(L->top-ra):(params);
+        unsigned int idx;
+        count = (count>VECTOR_ELEMENT_LEN)?(VECTOR_ELEMENT_LEN):(count);
+        for(idx=0; idx<count; idx++) {
+          TValue* v = ra+idx;
+          vt[idx] = nvalue(v);
+        }
+        TVector* new_vt = luaVT_new(L);
+        for(idx=0; idx<VECTOR_ELEMENT_LEN; idx++) {
+          new_vt->elements[idx] = vt[idx];
+        }
+        setvtvalue(L, ra, new_vt);
+        checkGC(L, ra+1);
+        vmbreak;
+      }
+      vmcase(OP_VT_CLONE) {
+        TValue *rb = RKB(i);
+        if(!ttisvector(ra) || !ttisvector(rb))
+          luaG_runerror(L, "[VT] value not a vector");
+        TVector* v1 = vtvalue(ra);
+        TVector* v2 = vtvalue(rb);
+        luaVT_clone(v2, v1);
+        vmbreak;
+      }
+      vmcase(OP_VT_IADD) {
+        TValue *rb = RKB(i);
+        if(!ttisvector(ra) || !ttisvector(rb))
+          luaG_runerror(L, "[VT] value not a vector");
+        TVector* v1 = vtvalue(ra);
+        TVector* v2 = vtvalue(rb);
+        luaVT_add(v1, v2, v1);
+        vmbreak;
+      }
+      vmcase(OP_VT_ISUB) {
+        TValue *rb = RKB(i);
+        if(!ttisvector(ra) || !ttisvector(rb))
+          luaG_runerror(L, "[VT] value not a vector");
+        TVector* v1 = vtvalue(ra);
+        TVector* v2 = vtvalue(rb);
+        luaVT_sub(v1, v2, v1);
+        vmbreak;
+      }
+      vmcase(OP_VT_IMUL) {
+        TValue *rb = RKB(i);
+        if(ttisvector(ra) && ttisvector(rb)){
+          TVector* v1 = vtvalue(ra);
+          TVector* v2 = vtvalue(rb);
+          lua_Number v = luaVT_mul(v1, v2);
+          setfltvalue(ra, v);
+        }else if(ttisvector(ra) && ttisnumber(rb)) {
+          TVector* v1 = vtvalue(ra);
+          lua_Number v2 = nvalue(rb);
+          luaVT_scale(v1, v2, v1);
+        }else {
+          luaG_runerror(L, "[VT] error arithmetic type");
+        }      
+        vmbreak;
+      }
+      vmcase(OP_VT_IDISTANCE) {
+        TValue *rb = RKB(i);
+        if(!ttisvector(ra) || !ttisvector(rb))
+          luaG_runerror(L, "[VT] value not a vector");
+        TVector* v1 = vtvalue(ra);
+        TVector* v2 = vtvalue(rb);
+        lua_Number v = luaVT_distance(v1, v2);
+        setfltvalue(ra, v);
         vmbreak;
       }
     }

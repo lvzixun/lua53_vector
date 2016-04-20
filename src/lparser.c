@@ -808,7 +808,7 @@ static int explist (LexState *ls, expdesc *v) {
 }
 
 
-static void funcargs (LexState *ls, expdesc *f, int line) {
+static void funcargs (LexState *ls, expdesc *f, int line, OpCode op) {
   FuncState *fs = ls->fs;
   expdesc args;
   int base, nparams;
@@ -846,13 +846,11 @@ static void funcargs (LexState *ls, expdesc *f, int line) {
       luaK_exp2nextreg(fs, &args);  /* close last argument */
     nparams = fs->freereg - (base+1);
   }
-  init_exp(f, VCALL, luaK_codeABC(fs, OP_CALL, base, nparams+1, 2));
+  init_exp(f, VCALL, luaK_codeABC(fs, op, base, nparams+1, 2));
   luaK_fixline(fs, line);
   fs->freereg = base+1;  /* call remove function and arguments and leaves
                             (unless changed) one result */
 }
-
-
 
 
 /*
@@ -908,12 +906,12 @@ static void suffixedexp (LexState *ls, expdesc *v) {
         luaX_next(ls);
         checkname(ls, &key);
         luaK_self(fs, v, &key);
-        funcargs(ls, v, line);
+        funcargs(ls, v, line, OP_CALL);
         break;
       }
       case '(': case TK_STRING: case '{': {  /* funcargs */
         luaK_exp2nextreg(fs, v);
-        funcargs(ls, v, line);
+        funcargs(ls, v, line, OP_CALL);
         break;
       }
       default: return;
@@ -922,9 +920,73 @@ static void suffixedexp (LexState *ls, expdesc *v) {
 }
 
 
+static void vt_create_exp(LexState* ls, expdesc* f) {
+  int base = ls->fs->freereg;
+  FuncState *fs = ls->fs;
+  expdesc args;
+  unsigned int nparams;
+  int line = ls->linenumber;
+
+  luaX_next(ls);
+  switch(ls->t.token){
+    case '(': {
+      luaX_next(ls);
+      if(ls->t.token == ')') {
+        args.k = VVOID;
+      } else {
+        explist(ls, &args);
+        luaK_setmultret(fs, &args);
+      }
+      check_match(ls, ')', '(', line);
+      break;
+    }
+    default: {
+      luaX_syntaxerror(ls, "[VT] create elements expected");
+    }
+  }
+
+  if(hasmultret(args.k))
+    nparams = LUA_MULTRET;
+  else{
+    if (args.k != VVOID){
+      luaK_exp2nextreg(fs, &args);  /* close last argument */
+    }
+    nparams = fs->freereg -(base+1);
+  }
+  
+  luaK_codeABx(fs, OP_VT_CREATE, base, nparams+1);
+  init_exp(f, VNONRELOC, base);
+  luaK_fixline(fs, line);
+  fs->freereg = base+1;
+}
+
+
+
+static void _vt_opr_exp(LexState* ls, expdesc* f, OpCode op) {
+  expdesc v;
+
+  luaX_next(ls);
+  int line = ls->linenumber;
+  checknext(ls, '(');
+
+  if(ls->t.token == TK_VT_CREATE){
+    vt_create_exp(ls, f);
+  }else {
+    suffixedexp(ls, f);
+    check_condition(ls, vkisvar(f->k), "syntax error");
+  }
+  checknext(ls, ',');
+
+  expr(ls, &v);
+  checknext(ls, ')');
+  
+  luaK_vtposfix(ls->fs, op, f, &v, line);
+}
+
+
 static void simpleexp (LexState *ls, expdesc *v) {
   /* simpleexp -> FLT | INT | STRING | NIL | TRUE | FALSE | ... |
-                  constructor | FUNCTION body | suffixedexp */
+                  constructor | FUNCTION body | suffixedexp | VECTOR_OP_*  */
   switch (ls->t.token) {
     case TK_FLT: {
       init_exp(v, VKFLT, 0);
@@ -958,6 +1020,30 @@ static void simpleexp (LexState *ls, expdesc *v) {
                       "cannot use '...' outside a vararg function");
       init_exp(v, VVARARG, luaK_codeABC(fs, OP_VARARG, 0, 1, 0));
       break;
+    }
+    case TK_VT_CREATE:{
+      vt_create_exp(ls, v);
+      return;
+    }
+    case TK_VT_CLONE: {
+      _vt_opr_exp(ls, v, OP_VT_CLONE);
+      return;
+    }
+    case TK_VT_IADD:{
+      _vt_opr_exp(ls, v, OP_VT_IADD);
+      return;
+    }
+    case TK_VT_ISUB:{
+      _vt_opr_exp(ls, v, OP_VT_ISUB);
+      return;
+    }
+    case TK_VT_IMUL:{
+      _vt_opr_exp(ls, v, OP_VT_IMUL);
+      return;
+    }
+    case TK_VT_IDISTANCE:{
+      _vt_opr_exp(ls, v, OP_VT_IDISTANCE);
+      return;
     }
     case '{': {  /* constructor */
       constructor(ls, v);
@@ -1582,6 +1668,31 @@ static void statement (LexState *ls) {
       luaX_next(ls);  /* skip RETURN */
       retstat(ls);
       break;
+    }
+    case TK_VT_CLONE: {
+      expdesc v;
+      _vt_opr_exp(ls, &v, OP_VT_CLONE);
+      break;
+    }
+    case TK_VT_IADD: {
+      expdesc v;
+      _vt_opr_exp(ls, &v, OP_VT_IADD);
+      break;
+    }
+    case TK_VT_ISUB: {
+      expdesc v;
+      _vt_opr_exp(ls, &v, OP_VT_ISUB);
+      break;
+    }
+    case TK_VT_IMUL:{
+      expdesc v;
+      _vt_opr_exp(ls, &v, OP_VT_IMUL);
+      return;
+    }
+    case TK_VT_IDISTANCE:{
+      expdesc v;
+      _vt_opr_exp(ls, &v, OP_VT_IDISTANCE);
+      return;
     }
     case TK_BREAK:   /* stat -> breakstat */
     case TK_GOTO: {  /* stat -> 'goto' NAME */

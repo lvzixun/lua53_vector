@@ -880,6 +880,26 @@ void luaK_infix (FuncState *fs, BinOpr op, expdesc *v) {
   }
 }
 
+void luaK_vtposfix (FuncState *fs, OpCode op,
+                    expdesc *e1, expdesc *e2, int line) {
+  switch(op) {
+    case OP_VT_CLONE:
+    case OP_VT_IADD:
+    case OP_VT_ISUB:
+    case OP_VT_IMUL:
+    case OP_VT_IDISTANCE: {
+      int o1 = luaK_exp2anyreg(fs, e1);
+      int o2 = luaK_exp2RK(fs, e2);
+      luaK_codeABC(fs, op, o1, o2, 0);
+      freeexp(fs, e2);
+      luaK_fixline(fs, line);
+      return;
+    }
+    default:
+      assert(0);
+  }
+}
+
 
 void luaK_posfix (FuncState *fs, BinOpr op,
                   expdesc *e1, expdesc *e2, int line) {

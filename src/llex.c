@@ -550,6 +550,33 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         else if (!lisdigit(ls->current)) return '.';
         else return read_numeral(ls, seminfo);
       }
+      case '@': { // custom op
+        next(ls);
+        switch(ls->current){
+          case 'v':
+          case 'V':
+            next(ls);
+            return TK_VT_CREATE;
+          case 'c':
+          case 'C':
+            next(ls);
+            return TK_VT_CLONE;
+          case '+':
+            next(ls);
+            return TK_VT_IADD;
+          case '-':
+            next(ls);
+            return TK_VT_ISUB;
+          case '*':
+            next(ls);
+            return TK_VT_IMUL;
+          case '^':
+            next(ls);
+            return TK_VT_IDISTANCE;
+          default:
+            lexerror(ls, "[VT] undefined custom symbol", 0);
+        }
+      }
       case '0': case '1': case '2': case '3': case '4':
       case '5': case '6': case '7': case '8': case '9': {
         return read_numeral(ls, seminfo);

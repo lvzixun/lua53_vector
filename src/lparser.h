@@ -31,7 +31,7 @@ typedef enum {
   VJMP,		/* info = instruction pc */
   VRELOCABLE,	/* info = instruction pc */
   VCALL,	/* info = instruction pc */
-  VVARARG	/* info = instruction pc */
+  VVARARG,	/* info = instruction pc */
 } expkind;
 
 

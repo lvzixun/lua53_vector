@@ -20,6 +20,18 @@
 #include "lauxlib.h"
 #include "lualib.h"
 
+static int luaB_vector_unpack(lua_State* L) {
+  lua_vector vt;
+  if(!lua_tovector(L, 1, &vt)){
+    luaL_error(L, "expected vector type.");
+  }
+
+  int i;
+  for(i=0; i<VECTOR_ELEMENT_LEN; i++){
+    lua_pushnumber(L, vt.elements[i]);
+  }
+  return VECTOR_ELEMENT_LEN;
+}
 
 static int luaB_print (lua_State *L) {
   int n = lua_gettop(L);  /* number of arguments */
@@ -482,6 +494,7 @@ static const luaL_Reg base_funcs[] = {
   {"pairs", luaB_pairs},
   {"pcall", luaB_pcall},
   {"print", luaB_print},
+  {"vtunpack", luaB_vector_unpack},
   {"rawequal", luaB_rawequal},
   {"rawlen", luaB_rawlen},
   {"rawget", luaB_rawget},
